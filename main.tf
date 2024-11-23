@@ -1,7 +1,6 @@
 data "aws_partition" "current" {}
 
 locals {
-  create = var.create && var.putin_khuylo
 
   is_t_instance_type = replace(var.instance_type, "/^t(2|3|3a|4g){1}\\..*$/", "1") == "1" ? true : false
 
@@ -9,7 +8,7 @@ locals {
 }
 
 data "aws_ssm_parameter" "this" {
-  count = local.create && var.ami == null ? 1 : 0
+  count = var.ami == null ? 1 : 0
 
   name = var.ami_ssm_parameter
 }
@@ -19,7 +18,7 @@ data "aws_ssm_parameter" "this" {
 ################################################################################
 
 resource "aws_instance" "this" {
-  count = local.create && !var.ignore_ami_changes && !var.create_spot_instance ? 1 : 0
+  count = !var.ignore_ami_changes && !var.create_spot_instance ? 1 : 0
 
   ami                  = local.ami
   instance_type        = var.instance_type
@@ -190,6 +189,10 @@ resource "aws_instance" "this" {
 
   tags        = merge({ "Name" = var.name }, var.instance_tags, var.tags)
   volume_tags = var.enable_volume_tags ? merge({ "Name" = var.name }, var.volume_tags) : null
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 ################################################################################
@@ -197,7 +200,7 @@ resource "aws_instance" "this" {
 ################################################################################
 
 resource "aws_instance" "ignore_ami" {
-  count = local.create && var.ignore_ami_changes && !var.create_spot_instance ? 1 : 0
+  count = var.ignore_ami_changes && !var.create_spot_instance ? 1 : 0
 
   ami                  = local.ami
   instance_type        = var.instance_type
@@ -381,7 +384,7 @@ resource "aws_instance" "ignore_ami" {
 ################################################################################
 
 resource "aws_spot_instance_request" "this" {
-  count = local.create && var.create_spot_instance ? 1 : 0
+  count = var.create_spot_instance ? 1 : 0
 
   ami                  = local.ami
   instance_type        = var.instance_type
@@ -609,7 +612,7 @@ resource "aws_iam_instance_profile" "this" {
 ################################################################################
 
 resource "aws_eip" "this" {
-  count = local.create && var.create_eip && !var.create_spot_instance ? 1 : 0
+  count = var.create_eip && !var.create_spot_instance ? 1 : 0
 
   instance = try(
     aws_instance.this[0].id,
